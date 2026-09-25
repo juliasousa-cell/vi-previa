@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Projetos VI &amp; Municípios — IBGE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="concessoes_municipios.js"></script>
+<script src="projetos_vi.js"></script>
+<style>
+  :root{
+    --primary-color:#0056b3; --accent-color:#2563eb; --bg-light:#F8F9FA;
+    --card-bg:#ffffff; --text-primary:#1e293b; --text-secondary:#64748b;
+    --border-color:#e2e8f0; --shadow-sm:0 1px 2px 0 rgba(0,0,0,.05);
+    --shadow-md:0 4px 20px rgba(0,0,0,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{font-family:'Inter',sans-serif;background:var(--bg-light);color:var(--text-primary);
+       line-height:1.5;-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+  /* ===== Header ===== */
+  .main-header{flex:none;background:linear-gradient(180deg,#1C407A 0%,#173763 100%);padding:0 28px;
+               display:flex;align-items:center;gap:20px;height:72px;
+               border-bottom:1px solid rgba(0,0,0,.18);box-shadow:0 2px 12px rgba(23,55,99,.22)}
+  .logo-img{height:48px;width:auto;display:block;flex-shrink:0}
+  .header-sep{width:1px;height:40px;background:rgba(255,255,255,.22);flex-shrink:0}
+  .title-container{display:flex;flex-direction:column;justify-content:center;min-width:0}
+  .title-kicker{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:rgba(255,255,255,.62);line-height:1}
+  .title-container h1{font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.045em;line-height:1.15;color:#fff;margin-top:4px;white-space:nowrap}
+  .main-nav{display:flex;gap:8px;margin-left:auto;align-items:center}
+  .nav-btn{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:999px;
+           padding:9px 19px;font-size:12px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;
+           transition:all .2s ease;text-transform:uppercase;letter-spacing:.07em}
+  .nav-btn:hover{background:rgba(255,255,255,.20);color:#fff;border-color:rgba(255,255,255,.35)}
+  .nav-btn.active{background:#fff;color:#1C407A;border-color:#fff;font-weight:800;box-shadow:0 2px 9px rgba(0,0,0,.18)}
+  /* segmentador da base populacional (Censo 2022 / Estimativa 2025) */
+  .seg{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);
+       border-radius:999px;padding:3px 3px 3px 11px}
+  .seg-cap{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.6);margin-right:2px}
+  .seg-btn{background:transparent;border:none;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:700;
+           color:rgba(255,255,255,.82);cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:all .2s ease;font-family:inherit;white-space:nowrap}
+  .seg-btn:hover{color:#fff}
+  .seg-btn.active{background:#fff;color:#1C407A;box-shadow:0 1px 5px rgba(0,0,0,.2)}
+  .nav-divider{width:1px;height:26px;background:rgba(255,255,255,.18);flex-shrink:0}
+
+  /* ===== Toolbar (KPIs + controles) ===== */
+  .toolbar{flex:none;display:flex;align-items:center;gap:12px;padding:8px 24px;min-height:83px;background:#fff;border-bottom:1px solid var(--border-color);flex-wrap:wrap}
+  /* mini KPIs */
+  .kpis{display:flex;gap:6px}
+  .mini-kpi{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px 11px;background:var(--bg-light);
+            border:1px solid var(--border-color);border-radius:12px}
+  .mini-kpi .v{font-size:26px;font-weight:800;color:var(--primary-color);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .mini-kpi .l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);line-height:1.15;max-width:76px}
+
+  .controls{display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap}
+  .ctl-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary)}
+  .btn{border:1px solid var(--border-color);background:#fff;border-radius:10px;padding:9px 14px;font-size:11px;font-weight:700;
+       text-transform:uppercase;letter-spacing:.06em;cursor:pointer;color:var(--primary-color);transition:all .2s ease;font-family:inherit;white-space:nowrap}
+  .btn:hover{background:#eef2ff;border-color:var(--primary-color)}
+
+  /* ===== Multi-select dropdown ===== */
+  .ms-wrap{position:relative}
+  #wrapConc{display:flex;align-items:center;gap:10px}
+  #wrapUf{display:flex;align-items:center;gap:8px}        /* rótulo ao lado da pill, centralizado */
+  #wrapUf .ms-display{min-width:120px}                    /* seletor de estados mais compacto */
+  #dropUf{width:248px}
+  /* SÓ no modo "Por estado": compacta também a pill de Concessões p/ a toolbar não quebrar.
+     No modo padrão "Por concessão" nada disto aplica (sem a classe .modo-uf). */
+  .toolbar.modo-uf #wrapConc .ms-display{min-width:120px;max-width:210px}
+  .toolbar.modo-uf #wrapConc .ms-display>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ms-display{display:flex;align-items:center;gap:10px;justify-content:space-between;min-width:280px;min-height:44px;
+              padding:10px 14px;background:#fff;border:1px solid var(--border-color);border-radius:11px;box-shadow:var(--shadow-sm);
+              cursor:pointer;font-size:13.5px;font-weight:600;transition:all .2s ease}
+  .ms-display:hover{border-color:var(--primary-color)}
+  .ms-display.on{border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(0,86,179,.1)}
+  .ms-display .ph{color:var(--text-secondary);font-weight:500}
+  .ms-display .arrow{font-size:10px;color:var(--text-secondary);transition:transform .2s ease}
+  .ms-display.on .arrow{transform:rotate(180deg)}
+  select.ms-native{min-width:180px;min-height:44px;padding:10px 36px 10px 14px;background:#fff;border:1px solid var(--border-color);
+        border-radius:11px;box-shadow:var(--shadow-sm);cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-primary);font-family:inherit;
+        appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+        background-repeat:no-repeat;background-position:right 14px center}
+  select.ms-native:hover{border-color:var(--primary-color)}
+  .ms-drop{position:absolute;top:calc(100% + 6px);right:0;width:368px;max-height:380px;overflow:hidden;background:#fff;
+           border:1px solid var(--border-color);border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.12);display:none;z-index:1500;
+           flex-direction:column}
+  .ms-drop.open{display:flex;animation:sd .18s ease-out}
+  @keyframes sd{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+  .ms-search{margin:8px 8px 6px;padding:8px 11px;border:1px solid var(--border-color);border-radius:8px;font-size:12.5px;font-family:inherit}
+  .ms-search:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(0,86,179,.1)}
+  .ms-chips{display:flex;gap:6px;flex-wrap:nowrap;padding:0 8px 7px}
+  .chip{padding:4px 10px;border-radius:999px;border:1.5px solid var(--border-color);background:#fff;font-size:9.5px;font-weight:700;
+        text-transform:uppercase;letter-spacing:.03em;cursor:pointer;color:var(--text-secondary);transition:all .15s ease}
+  .chip:hover{border-color:var(--primary-color);color:var(--primary-color)}
+  .chip.active{background:var(--primary-color);border-color:var(--primary-color);color:#fff}
+  .ms-list{overflow-y:auto;padding:3px 6px 8px;border-top:1px solid var(--border-color)}
+  .opt{display:flex;align-items:flex-start;gap:8px;padding:5px 9px;border-radius:7px;cursor:pointer;transition:background-color .15s ease}
+  .opt:hover{background:#f1f5f9}
+  .opt.sel{background:#eff6ff}
+  .opt input{width:16px;height:16px;accent-color:var(--primary-color);cursor:pointer;margin-top:2px;flex-shrink:0}
+  .opt .sw{width:10px;height:10px;border-radius:3px;margin-top:5px;flex-shrink:0;visibility:hidden}
+  .opt.sel .sw{visibility:visible}
+  .opt .ob{flex:1;min-width:0}
+  .opt .on-nome{font-size:12px;font-weight:600;color:var(--text-primary);line-height:1.2}
+  .opt.sel .on-nome{color:var(--primary-color);font-weight:700}
+  .opt-todos{border-bottom:1px solid var(--border-color);border-radius:0;margin-bottom:3px}
+  .opt-todos .on-nome{font-weight:700}
+  .opt .ometa{font-size:9.5px;color:var(--text-secondary);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .t-ferro{color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:4px}
+  .badge.Concluído{background:#dcfce7;color:#166534}
+  .badge.Edital{background:#fee2e2;color:#991b1b}
+  .badge.Emestudo{background:#fef9c3;color:#854d0e}
+  .badge.semstatus{background:#e2e8f0;color:#475569}
+  /* filtro de setores (setor > subsetor) */
+  #wrapSetor{display:flex;align-items:center;gap:10px}
+  #wrapSetor .ms-display{min-width:210px}
+  #dropSetor{width:300px;max-height:460px}
+  .opt.opt-grupo{border-top:1px solid var(--border-color);border-radius:0;margin-top:2px;padding-top:7px}
+  .opt.opt-grupo .on-nome{font-weight:800;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
+  .opt.opt-sub{padding-left:28px}
+  .toolbar.modo-uf #wrapSetor .ms-display{min-width:140px;max-width:190px}
+  .t-setor{color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+
+  /* ===== Tags bar ===== */
+  .tagsbar{flex:none;display:flex;align-items:center;gap:8px;padding:9px 24px;background:#fff;border-bottom:1px solid var(--border-color);
+           overflow-x:auto;white-space:nowrap;min-height:0}
+  .tagsbar:empty{display:none}
+  .tag{display:inline-flex;align-items:center;gap:7px;padding:5px 8px 5px 11px;border-radius:8px;border:1px solid var(--border-color);
+       background:#f8fafc;font-size:11px;font-weight:700;color:var(--text-primary);flex-shrink:0}
+  .tag .sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+  .tag .x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;color:#94a3b8;
+          font-size:14px;cursor:pointer;transition:all .15s ease}
+  .tag .x:hover{background:#fee2e2;color:#ef4444}
+
+  /* ===== Workspace ===== */
+  .workspace{flex:1;display:flex;gap:16px;padding:16px 24px;min-height:0;overflow:hidden}
+  .card{background:#fff;border:1px solid var(--border-color);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden}
+  .map-card{flex:1;min-width:0;position:relative}
+  #mapa{width:100%;height:100%}
+  #mapa.estilo-vi{background:#21528C}   /* Estilo VI: fundo atrás do Brasil */
+  /* expandir o mapa para tela cheia + legenda só na expansão */
+  .map-card.expandido{position:fixed;inset:0;width:auto;height:auto;margin:0;border-radius:0;z-index:4000}
+  .mapa-expand-ctl a{display:flex;align-items:center;justify-content:center;color:#0056b3}
+  .mapa-expand-ctl a:hover{color:#003d80}
+  .mapa-legenda{display:none;background:rgba(255,255,255,.68);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    border:1px solid var(--border-color);border-radius:10px;
+    box-shadow:0 6px 20px rgba(0,0,0,.16);padding:10px 12px;max-height:86vh;overflow-y:auto;overflow-x:hidden;max-width:340px}
+  .mapa-legenda .leg-tit{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:7px}
+  .mapa-legenda .leg-tab{width:100%;border-collapse:collapse}
+  .mapa-legenda .leg-tab td{padding:4px 4px;vertical-align:top;font-size:12.5px;border-top:1px solid rgba(0,0,0,.07)}
+  .mapa-legenda .leg-tab tr:first-child td{border-top:none}
+  .mapa-legenda .leg-c{font-weight:600;color:var(--text-primary);line-height:1.3;word-break:break-word}
+  .mapa-legenda .leg-sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:middle}
+  .mapa-legenda .leg-pop{text-align:right;white-space:nowrap;font-weight:700;color:#111;font-variant-numeric:tabular-nums;padding-left:14px}
+  /* tooltip do município: borda com a(s) cor(es) da(s) concessão(ões) */
+  .leaflet-tooltip.mtip-tt{background:transparent;border:none;box-shadow:none;padding:0;white-space:normal}
+  .leaflet-tooltip.mtip-tt:before{display:none}     /* remove a setinha padrão */
+  .mtip-wrap{padding:2.5px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.22);max-width:300px}
+  .mtip{background:#fff;border-radius:7px;padding:7px 10px;font-size:12.5px;line-height:1.45;color:var(--text-primary)}
+  .mtip b{color:var(--text-primary)}
+  .mtip-pop{font-weight:800;font-size:14.5px;color:#111}
+  .side{width:420px;flex:none;display:flex;flex-direction:column;min-height:0}
+  .side-head{flex:none;padding:11px 16px 11px 18px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sh-left{min-width:0}
+  .side-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--primary-color)}
+  .side-head .mp{display:block;font-size:11px;color:var(--text-secondary);margin-top:2px;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side-head .mp b{color:var(--text-primary)}
+  .btn-dl{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border-color);background:#fff;border-radius:9px;padding:8px 13px;
+          font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;color:var(--primary-color);transition:all .2s ease;
+          font-family:inherit;white-space:nowrap;flex-shrink:0}
+  .btn-dl:hover:not(:disabled){background:#eef2ff;border-color:var(--primary-color)}
+  .btn-dl:disabled{opacity:.45;cursor:not-allowed;color:var(--text-secondary)}
+  .side-body{flex:1;overflow-y:auto;min-height:0}
+  .placeholder{padding:34px 20px;color:var(--text-secondary);font-size:13.5px;text-align:center}
+  .placeholder.placeholder-uf{color:#dc2626;font-weight:600}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;text-align:left}
+  thead th{background:#f8fafc;color:var(--text-secondary);font-weight:700;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;
+           padding:11px 14px;border-bottom:2px solid var(--border-color);position:sticky;top:0;z-index:5}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:8px}
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--border-color)}
+  tbody tr:hover td{background:#fafbfc}
+  td.pop{font-weight:700}
+  td.ext{color:var(--text-secondary)}
+  tr.grupo td{background:#eff6ff;border-top:2px solid var(--border-color);border-bottom:1px solid #dbeafe;font-weight:800;color:var(--primary-color);font-size:12px}
+  tr.grupo .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:8px}
+  tr.subtotal td{background:#f8fafc;font-weight:700;color:var(--text-secondary);font-style:italic;font-size:12.5px}
+  tbody .dot{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:9px}
+  tfoot td{padding:13px 14px;font-weight:800;background:#dbeafe;border-top:2px solid var(--primary-color);color:var(--primary-color);font-size:14px;position:sticky;bottom:0}
+
+  .side-body::-webkit-scrollbar,.ms-list::-webkit-scrollbar,.tagsbar::-webkit-scrollbar{width:8px;height:8px}
+  .side-body::-webkit-scrollbar-thumb,.ms-list::-webkit-scrollbar-thumb,.tagsbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
+  .hide{display:none !important}
+
+  @media(max-width:920px){
+    body{overflow:auto;height:auto}
+    .workspace{flex-direction:column;height:auto;overflow:visible}
+    .map-card{height:55vh}.side{width:100%}
+    .controls{margin-left:0;width:100%}
+    .ms-display,.ms-drop{width:100%;min-width:0;right:auto;left:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="main-header">
+  <img src="logo-houer.png" class="logo-img" alt="HOUER — Impactando Gerações">
+  <div class="header-sep"></div>
+  <div class="title-container">
+    <span class="title-kicker">VI HOUER</span>
+    <h1>Projetos e Concessões</h1>
+  </div>
+  <nav class="main-nav">
+    <div class="seg" id="baseSeg" title="Fonte da população">
+      <span class="seg-cap">Base pop.</span>
+      <button class="seg-btn" data-base="2022">Censo 2022</button>
+      <button class="seg-btn active" data-base="2025">Est. 2025</button>
+    </div>
+    <span class="nav-divider"></span>
+    <button class="nav-btn active" data-modo="conc">Por concessão</button>
+    <button class="nav-btn" data-modo="uf">Por estado</button>
+    <span class="nav-divider"></span>
+    <button class="nav-btn" id="btnEstiloVI" title="Estilo VI: só o Brasil em destaque + traçados em cor única">Estilo VI</button>
+  </nav>
+</header>
+
+<!-- Toolbar: KPIs no topo + controles -->
+<div class="toolbar">
+  <div class="kpis">
+    <div class="mini-kpi"><span class="v" id="k1">0</span><span class="l" id="k1l">Projetos</span></div>
+    <div class="mini-kpi"><span class="v" id="kEst">0</span><span class="l">Estados</span></div>
+    <div class="mini-kpi"><span class="v" id="k2">0</span><span class="l">Municípios</span></div>
+    <div class="mini-kpi"><span class="v" id="k3">—</span><span class="l">População Impactada</span></div>
+    <div class="mini-kpi" id="kpiExt" title="Extensão adotada das concessões selecionadas, somada direto (concessões distintas não compartilham quilometragem). Na tabela, esse total aparece rateado município a município."><span class="v" id="k4">—</span><span class="l">Extensão (km)</span></div>
+  </div>
+
+  <div class="controls">
+    <!-- seletor de ESTADOS (multi; só no modo "Por estado") -->
+    <div class="ms-wrap hide" id="wrapUf">
+      <span class="ctl-label">Estados</span>
+      <div class="ms-display" id="dispUf"><span class="ph" id="dispUfTxt">Selecione estados…</span><span class="arrow">▾</span></div>
+      <div class="ms-drop" id="dropUf">
+        <div class="ms-list" id="listUf"></div>
+      </div>
+    </div>
+
+    <!-- filtro de SETORES (setor > subsetor; vazio = todos) -->
+    <div class="ms-wrap" id="wrapSetor">
+      <span class="ctl-label">Setores</span>
+      <div class="ms-display" id="dispSetor"><span class="ph" id="dispSetorTxt">Todos os setores</span><span class="arrow">▾</span></div>
+      <div class="ms-drop" id="dropSetor"><div class="ms-list" id="listSetor"></div></div>
+    </div>
+
+    <!-- lista de PROJETOS / CONCESSÕES (usada nos dois modos) -->
+    <div class="ms-wrap" id="wrapConc">
+      <span class="ctl-label">Projetos</span>
+      <div class="ms-display" id="dispConc"><span class="ph" id="dispConcTxt">Selecione projetos…</span><span class="arrow">▾</span></div>
+      <div class="ms-drop" id="dropConc">
+        <input type="search" class="ms-search" id="buscaConc" placeholder="Buscar nome, rodovia ou setor (ex.: BR-381, saúde)…" autocomplete="off">
+        <div class="ms-chips" id="esferaFiltros">
+          <button class="chip" data-acao="todas">Todas</button>
+          <button class="chip" data-acao="federal">Federais</button>
+          <button class="chip" data-acao="estadual">Estaduais</button>
+          <button class="chip" data-acao="ferroviaria">Ferroviárias</button>
+        </div>
+        <div class="ms-list" id="listConc"></div>
+      </div>
+    </div>
+
+    <button class="btn" id="limpar">Limpar</button>
+  </div>
+</div>
+
+<!-- chips das seleções -->
+<div class="tagsbar" id="tagsbar"></div>
+
+<!-- Workspace: mapa (esq) + tabela (dir) -->
+<div class="workspace">
+  <div class="card map-card"><div id="mapa"></div></div>
+  <aside class="card side">
+    <div class="side-head">
+      <div class="sh-left">
+        <span class="side-title">Municípios &amp; população</span>
+        <span class="mp" id="maisPop"></span>
+      </div>
+      <button class="btn-dl" id="btnDownload" disabled title="Baixar a seleção em Excel (.xlsx)">⬇&nbsp;Baixar Excel</button>
+    </div>
+    <div class="side-body" id="tabela">
+      <div class="placeholder">Selecione uma ou mais concessões para destacar os municípios e ver a população.</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const API="https://servicodados.ibge.gov.br/api";
+const CORES=["#0056b3","#e6194B","#3cb44b","#f58231","#911eb4","#0891b2","#f032e6","#16a34a",
+             "#9A6324","#dc2626","#7c3aed","#0d9488","#ca8a04","#be185d","#1d4ed8","#65a30d"];
+const fmt=n=>(n==null)?"—":Number(n).toLocaleString("pt-BR");
+
+// ===== extensão: base ÚNICA (o km da concessão, sem distinção de origem) =====
+const fmtKm2=n=>(n==null)?"—":Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const escAttr=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+function extTotal(nomes){   // soma da extensão das concessões informadas
+  return (nomes||[]).reduce((s,n)=>{const c=DADOS.find(x=>x.nome===n);return s+((c&&c.ext_km)||0);},0);
+}
+
+// ===== mapa =====
+const mapa=L.map("mapa").setView([-14.2,-51.9],4);
+const tiles=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {attribution:"© OpenStreetMap · Malha: IBGE",maxZoom:18}).addTo(mapa);
+const camadas=L.layerGroup().addTo(mapa);
+
+// ----- Estilo VI: esconde o mapa-múndi, mostra só o Brasil em destaque + traçados em cor única -----
+let estiloVI=false; const COR_VI="#1E3A5C"; const COR_UF_VI="#C2C9D4"; let brasilLayer=null; let _ufsVI=new Set();
+function ufsDestaque(){   // códigos IBGE dos estados (2 primeiros dígitos do id do município) das concessões marcadas
+  const s=new Set();
+  concSel.forEach(nome=>{const c=DADOS.find(x=>x.nome===nome); if(c) c.municipios.forEach(m=>s.add(String(m.id).slice(0,2)));});
+  return s;
+}
+function estiloEstado(f){   // estado com concessão = leve destaque; demais = branco
+  const on=_ufsVI.has(String(f.properties.codarea));
+  return {color:"#475569",weight:1,opacity:1,fillColor:on?COR_UF_VI:"#ffffff",fillOpacity:1};
+}
+function restilizarBrasil(){ if(brasilLayer){ _ufsVI=ufsDestaque(); brasilLayer.setStyle(estiloEstado); } }
+async function carregarBrasil(){   // malha de ESTADOS: Brasil branco c/ contorno dos estados em cinza escuro
+  if(brasilLayer) return brasilLayer;
+  const g=await(await fetch(`${API}/v4/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=UF`)).json();
+  _ufsVI=ufsDestaque();
+  brasilLayer=L.geoJSON(g,{style:estiloEstado});
+  return brasilLayer;
+}
+async function setEstiloVI(on){
+  estiloVI=on;
+  document.getElementById("btnEstiloVI").classList.toggle("active",on);
+  document.getElementById("mapa").classList.toggle("estilo-vi",on);
+  if(on){ mapa.removeLayer(tiles); (await carregarBrasil()).addTo(mapa); brasilLayer.bringToBack(); }
+  else { if(brasilLayer) mapa.removeLayer(brasilLayer); tiles.addTo(mapa); }
+  desenharMapa();
+}
+
+// ----- botão "expandir mapa" (abaixo do zoom) + legenda só na expansão -----
+const ICO_EXP='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M16 21h5v-5M8 21H3v-5"/></svg>';
+const ICO_RES='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V3h5M21 8V3h-5M21 16v5h-5M3 16v5h5"/></svg>';
+let mapaExpandido=false;
+const ctlExpand=L.control({position:'topleft'});
+ctlExpand.onAdd=function(){
+  const div=L.DomUtil.create('div','leaflet-bar mapa-expand-ctl');
+  const a=L.DomUtil.create('a','',div);
+  a.href='#'; a.id='btnExpandMapa'; a.title='Expandir o mapa'; a.innerHTML=ICO_EXP;
+  L.DomEvent.on(a,'click',L.DomEvent.stop).on(a,'click',toggleExpandir);
+  return div;
+};
+ctlExpand.addTo(mapa);
+const ctlLegenda=L.control({position:'topright'});
+ctlLegenda.onAdd=function(){ const d=L.DomUtil.create('div','mapa-legenda'); d.id='mapaLegenda'; return d; };
+ctlLegenda.addTo(mapa);
+function toggleExpandir(){
+  mapaExpandido=!mapaExpandido;
+  document.querySelector(".map-card").classList.toggle("expandido",mapaExpandido);
+  const a=document.getElementById("btnExpandMapa");
+  a.innerHTML=mapaExpandido?ICO_RES:ICO_EXP;
+  a.title=mapaExpandido?'Restaurar o mapa':'Expandir o mapa';
+  atualizarLegenda();
+  setTimeout(()=>mapa.invalidateSize(),80);
+}
+function atualizarLegenda(){
+  const el=document.getElementById("mapaLegenda"); if(!el) return;
+  if(!mapaExpandido || !concSel.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  const rows=concSel.map((nome,i)=>{
+    const c=DADOS.find(x=>x.nome===nome), pop=c?c.pop_total:0;
+    return `<tr><td class="leg-c"><span class="leg-sw" style="background:${estiloVI?COR_VI:CORES[i%CORES.length]}"></span>${nome}</td>`
+      +`<td class="leg-pop">${fmt(pop)}</td><td class="leg-pop">${c&&c.ext_km!=null?fmtKm2(c.ext_km)+" km":"—"}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="leg-tit">Projeto · População (${rotuloBase()}) · Extensão</div><table class="leg-tab">${rows}</table>`;
+}
+const malhaCache=new Map();
+async function buscarMalha(id){
+  if(malhaCache.has(id))return malhaCache.get(id);
+  const g=await(await fetch(`${API}/v4/malhas/municipios/${id}?formato=application/vnd.geo+json&qualidade=intermediaria`)).json();
+  malhaCache.set(id,g);return g;
+}
+
+// ===== estado =====
+let modo="conc"; let ufSel=[];  // modo "uf" = filtra as concessões por um ou mais estados
+let base="2025";                // base populacional ativa: "2022" (Censo) ou "2025" (Estimativa)
+// concessões apresentadas no painel (whitelist — o .js mantém todas as 32)
+const WHITELIST=["Autopista Fluminense","Fernão Dias","ECO-101","Régis Bittencourt","MSVia","Via Brasil",
+                 "CONCEBRA","Transbrasiliana","Nova Rota do Oeste","Raposo Castello - Ecovias",
+                 "Way-262","Way-112","Planalto Sul","Morro da Mesa","Litoral Sul","PR Vias",
+                 "INTERVIAS","SPS 235","Via Brasil MT-100","APASI","Rodovia da Mudança",
+                 "Lote 1 - Econorte","Lote 2 - Viapar","Lote 3 - Ecocataratas",
+                 "Lote 4 - Caminhos do Paraná","Lote 5 - Rodonorte","Lote 6 - Ecovia",
+                 "Estrada de Ferro Carajás","Rumo Malha Oeste","Estrada de Ferro Vitória a Minas"];
+const OCULTAS=[];   // ocultas temporariamente
+// nomes de exibição (aplicados DEPOIS da limpeza do "(...)", só na tela/exportação)
+const RENOMEAR={"ECO-101":"Ecovias Capixaba",
+  // sufixo textual marcando o conjunto de concessões do Paraná (não agrupa nem soma nada)
+  "Lote 1 - Econorte":"Lote 1 - Econorte - (PR-VIAS)",
+  "Lote 2 - Viapar":"Lote 2 - Viapar - (PR-VIAS)",
+  "Lote 3 - Ecocataratas":"Lote 3 - Ecocataratas - (PR-VIAS)",
+  "Lote 4 - Caminhos do Paraná":"Lote 4 - Caminhos do Paraná - (PR-VIAS)",
+  "Lote 5 - Rodonorte":"Lote 5 - Rodonorte - (PR-VIAS)",
+  "Lote 6 - Ecovia":"Lote 6 - Ecovia - (PR-VIAS)"};
+const FERROVIAS_SOLIDAS=["Estrada de Ferro Carajás"];   // linha sólida (traçado reto/longo: o tracejado "quebra" ao afastar)
+const DADOS=(window.DADOS_CONCESSOES||{concessoes:[]}).concessoes
+  .filter(c=>WHITELIST.some(w=>c.nome.includes(w)) && !OCULTAS.some(o=>c.nome.includes(o)));
+DADOS.forEach(c=>{
+  c.solida=c.tipo==="ferroviaria" && FERROVIAS_SOLIDAS.includes(c.nome);  // desenhar sólida em vez de tracejada
+  if(c.tipo!=="ferroviaria") c.nome=c.nome.replace(/\s*\(.*$/,"").trim();  // remove o "(...)" do nome (exceto ferrovias)
+  if(RENOMEAR[c.nome]) c.nome=RENOMEAR[c.nome];
+  c.busca=(c.nome+" "+c.status).toLowerCase();
+});
+// ----- setores: rodovias/ferrovias já mapeadas = Transportes; demais projetos vêm de projetos_vi.js -----
+DADOS.forEach(c=>{ c.setor="Transportes"; c.subsetor=c.tipo==="ferroviaria"?"Ferrovias":"Rodovias"; });
+((window.DADOS_PROJETOS||{projetos:[]}).projetos||[]).forEach(p=>{
+  if(DADOS.some(c=>c.nome===p.nome)) return;   // nunca duplica um projeto já presente
+  p.linha=null; p.solida=false;
+  DADOS.push(p);
+});
+DADOS.forEach(c=>{ c.busca=(c.busca||(c.nome+" "+(c.status||"")).toLowerCase())+" "+(c.setor+" "+c.subsetor+" "+(c.ente||"")).toLowerCase(); });
+DADOS.sort((a,b)=>{   // rodovias, ferrovias e depois os demais projetos (por setor); alfabético dentro de cada grupo
+  const ordem=c=>c.tipo==="rodoviaria"?0:(c.tipo==="ferroviaria"?1:2);
+  return ordem(a)-ordem(b) || (ordem(a)===2?a.setor.localeCompare(b.setor,"pt"):0) || a.nome.localeCompare(b.nome,"pt");
+});
+const concSel=[];
+let munSel=new Map(); let genMapa=0;
+
+// concessões aplicáveis ao modo atual (no modo "uf", as que passam por QUALQUER estado escolhido)
+function passaPorUf(c,uf){ return c.municipios.some(m=>m.uf===uf); }
+let setorSel=[];   // chaves "setor|subsetor" marcadas no filtro de setores (vazio = todos os setores)
+function passaSetor(c){ return !setorSel.length || setorSel.includes(c.setor+"|"+c.subsetor); }
+function concessoesAplicaveis(){
+  if(modo==="uf") return ufSel.length ? DADOS.filter(c=>passaSetor(c) && ufSel.some(uf=>passaPorUf(c,uf))) : [];
+  return DADOS.filter(passaSetor);
+}
+// nomes das concessões de um grupo de chip (Federais/Estaduais/Ferroviárias), dentro do escopo atual
+function grupoNomes(acao){
+  const base=concessoesAplicaveis();
+  if(acao==="ferroviaria") return base.filter(d=>d.tipo==="ferroviaria").map(d=>d.nome);
+  if(acao==="federal")     return base.filter(d=>d.tipo==="rodoviaria"&&d.esfera==="federal").map(d=>d.nome);
+  if(acao==="estadual")    return base.filter(d=>d.tipo==="rodoviaria"&&d.esfera==="estadual").map(d=>d.nome);
+  return [];
+}
+
+// ===== dropdown helpers =====
+function fecharDrops(){document.querySelectorAll(".ms-drop.open").forEach(d=>d.classList.remove("open"));
+  document.querySelectorAll(".ms-display.on").forEach(d=>d.classList.remove("on"));}
+function toggleDrop(dropId,dispId){
+  const drop=document.getElementById(dropId),aberto=drop.classList.contains("open");
+  fecharDrops(); if(!aberto){drop.classList.add("open");document.getElementById(dispId).classList.add("on");}
+}
+document.addEventListener("click",e=>{if(!e.target.closest(".ms-wrap"))fecharDrops();});
+document.getElementById("dispConc").onclick=()=>toggleDrop("dropConc","dispConc");
+document.getElementById("dispUf").onclick=()=>toggleDrop("dropUf","dispUf");
+
+// ===== modo CONCESSÃO =====
+function renderListConc(){
+  const lista=document.getElementById("listConc");
+  const base=concessoesAplicaveis();
+  const q=document.getElementById("buscaConc").value.trim().toLowerCase();
+  const arr=base.filter(c=>(!q||c.busca.includes(q)));
+  if(modo==="uf" && !ufSel.length){
+    lista.innerHTML='<div class="placeholder placeholder-uf">Selecione um ou mais estados para ver as concessões que passam por eles.</div>';
+  }else if(!arr.length){lista.innerHTML='<div class="placeholder">Nenhuma concessão.</div>';}
+  else lista.innerHTML=arr.map(c=>{
+    const i=concSel.indexOf(c.nome),on=i>=0;
+    const ferro=c.tipo==="ferroviaria"?'<span class="t-ferro">🚆 Ferrovia</span><span>·</span>'
+      :(c.tipo==="projeto"?`<span class="t-setor">${c.subsetor}</span><span>·</span>`:'');
+    return `<label class="opt ${on?'sel':''}">
+      <input type="checkbox" data-nome="${c.nome.replace(/"/g,'&quot;')}" ${on?'checked':''}>
+      <span class="sw" style="background:${on?CORES[i%CORES.length]:'transparent'}"></span>
+      <span class="ob"><span class="on-nome">${c.nome}</span>
+        <span class="ometa">${ferro}<span>${c.n_municipios} mun.</span><span>·</span><span>${fmt(c.pop_total)} hab</span>
+          ${c.ext_km!=null?`<span>·</span><span>${fmtKm2(c.ext_km)} km</span>`:""}</span></span></label>`;
+  }).join("");
+  const n=concSel.length;
+  const dctxt = n ? (modo==="uf" ? n+(n>1?" projetos":" projeto") : n+" projeto(s) selecionado(s)")
+                  : (modo==="uf" ? "Projetos…" : "Selecione projetos…");
+  document.getElementById("dispConcTxt").outerHTML=`<span class="${n?'':'ph'}" id="dispConcTxt">${dctxt}</span>`;
+  const ct=document.querySelector('#esferaFiltros [data-acao="todas"]');
+  if(ct) ct.classList.toggle("active", base.length>0 && n===base.length);
+  ["federal","estadual","ferroviaria"].forEach(acao=>{
+    const chip=document.querySelector(`#esferaFiltros [data-acao="${acao}"]`);
+    if(chip){const g=grupoNomes(acao); chip.classList.toggle("active", g.length>0 && g.every(x=>concSel.includes(x)));}
+  });
+}
+function toggleConc(nome,on){
+  const i=concSel.indexOf(nome);
+  if(on&&i<0)concSel.push(nome); else if(!on&&i>=0)concSel.splice(i,1);
+  recompor();
+}
+// base populacional: re-aponta m.pop e c.pop_total p/ 2022 (Censo) ou 2025 (Estimativa) e reordena
+function aplicarBase(b){
+  base=b;
+  DADOS.forEach(c=>{
+    c.municipios.forEach(m=>{ m.pop = (b==="2025" ? m.pop2025 : m.pop2022); });
+    c.municipios.sort((x,y)=>((x.pop==null)-(y.pop==null)) || ((y.pop||0)-(x.pop||0)));
+    c.pop_total = c.municipios.reduce((s,m)=>s+(m.pop||0),0);
+  });
+}
+function rotuloBase(){ return base==="2025" ? "Est. 2025" : "Censo 2022"; }
+function recompor(){
+  munSel=new Map();
+  concSel.forEach((nome,ci)=>{
+    const c=DADOS.find(x=>x.nome===nome); if(!c)return;
+    const cor=CORES[ci%CORES.length];
+    c.municipios.forEach(m=>{
+      if(!munSel.has(m.id)) munSel.set(m.id,{...m,cor,conc:nome,concs:[nome]});
+      else munSel.get(m.id).concs.push(nome);   // município em +1 concessão: acumula
+    });
+  });
+  renderListConc(); renderTabela(); renderTags(); desenharMapa(); resumo(); atualizarLegenda();
+}
+
+// ===== modo ESTADO (filtra as CONCESSÕES por UF) =====
+const UF_NOMES={AC:"Acre",AL:"Alagoas",AP:"Amapá",AM:"Amazonas",BA:"Bahia",CE:"Ceará",
+  DF:"Distrito Federal",ES:"Espírito Santo",GO:"Goiás",MA:"Maranhão",MT:"Mato Grosso",
+  MS:"Mato Grosso do Sul",MG:"Minas Gerais",PA:"Pará",PB:"Paraíba",PR:"Paraná",PE:"Pernambuco",
+  PI:"Piauí",RJ:"Rio de Janeiro",RN:"Rio Grande do Norte",RS:"Rio Grande do Sul",RO:"Rondônia",
+  RR:"Roraima",SC:"Santa Catarina",SP:"São Paulo",SE:"Sergipe",TO:"Tocantins"};
+let ESTADOS_DISP=[];   // siglas dos estados existentes nos dados (ordenadas por nome)
+function popularEstados(){   // só os estados que ALGUMA concessão atravessa
+  const ufs=new Set(); DADOS.forEach(c=>c.municipios.forEach(m=>{if(m.uf)ufs.add(m.uf);}));
+  ESTADOS_DISP=[...ufs].sort((a,b)=>(UF_NOMES[a]||a).localeCompare(UF_NOMES[b]||b,"pt"));
+  renderListUf();
+}
+function renderListUf(){
+  const k=ufSel.length, todos=ESTADOS_DISP.length>0 && k===ESTADOS_DISP.length;
+  // opção interna "Todos os estados", sempre a primeira
+  let html=`<label class="opt opt-todos ${todos?'sel':''}">
+    <input type="checkbox" data-all="1" ${todos?'checked':''}>
+    <span class="sw" style="background:${todos?'var(--primary-color)':'transparent'}"></span>
+    <span class="ob"><span class="on-nome">Todos os estados</span>
+      <span class="ometa"><span>${ESTADOS_DISP.length} estados</span></span></span></label>`;
+  html+=ESTADOS_DISP.map(u=>{
+    const on=ufSel.includes(u), n=DADOS.filter(c=>passaPorUf(c,u)).length;
+    return `<label class="opt ${on?'sel':''}">
+      <input type="checkbox" data-uf="${u}" ${on?'checked':''}>
+      <span class="sw" style="background:${on?'var(--primary-color)':'transparent'}"></span>
+      <span class="ob"><span class="on-nome">${UF_NOMES[u]||u} (${u})</span>
+        <span class="ometa"><span>${n} concessão(ões)</span></span></span></label>`;
+  }).join("");
+  document.getElementById("listUf").innerHTML=html;
+  const all=document.querySelector('#listUf input[data-all]');
+  if(all) all.indeterminate = k>0 && !todos;   // traço quando seleção parcial
+  document.getElementById("dispUfTxt").outerHTML=`<span class="${k?'':'ph'}" id="dispUfTxt">${k?k+(k>1?" estados":" estado"):"Estados…"}</span>`;
+}
+function reporConcessoesDoEstado(){   // após mudar o conjunto de estados, repõe todas as concessões aplicáveis
+  concSel.length=0; document.getElementById("buscaConc").value="";
+  concessoesAplicaveis().forEach(c=>concSel.push(c.nome));
+  renderListUf(); recompor();
+}
+function toggleUf(sigla,on){   // marca/desmarca um estado (concessões aplicáveis são refináveis depois)
+  const i=ufSel.indexOf(sigla);
+  if(on&&i<0)ufSel.push(sigla); else if(!on&&i>=0)ufSel.splice(i,1);
+  reporConcessoesDoEstado();
+}
+function toggleTodosUf(){      // chip "Todos os estados": marca/desmarca todos
+  const todos=ESTADOS_DISP.length>0 && ufSel.length===ESTADOS_DISP.length;
+  ufSel.length=0;
+  if(!todos) ESTADOS_DISP.forEach(u=>ufSel.push(u));
+  reporConcessoesDoEstado();
+}
+
+// ===== filtro de SETORES (setor > subsetor) =====
+function setoresDisp(){   // [{setor, subs:[...]}] a partir dos dados carregados
+  const m=new Map(); DADOS.forEach(c=>{ if(!m.has(c.setor)) m.set(c.setor,new Set()); m.get(c.setor).add(c.subsetor); });
+  return [...m.keys()].sort((a,b)=>a.localeCompare(b,"pt")).map(s=>({setor:s,subs:[...m.get(s)].sort((a,b)=>a.localeCompare(b,"pt"))}));
+}
+function renderListSetor(){
+  const grupos=setoresDisp(), todos=!setorSel.length;
+  const nProj=k=>DADOS.filter(c=>c.setor+"|"+c.subsetor===k).length;
+  const opt=(cls,attr,on,nome,meta)=>`<label class="opt ${cls} ${on?'sel':''}"><input type="checkbox" ${attr} ${on?'checked':''}>
+    <span class="sw" style="background:${on?'var(--primary-color)':'transparent'}"></span>
+    <span class="ob"><span class="on-nome">${nome}</span><span class="ometa"><span>${meta}</span></span></span></label>`;
+  let html=opt("opt-todos",'data-setor-todos="1"',todos,"Todos os setores",DADOS.length+" projetos");
+  grupos.forEach(g=>{
+    const ks=g.subs.map(s=>g.setor+"|"+s), on=ks.every(k=>setorSel.includes(k)), parc=!on&&ks.some(k=>setorSel.includes(k));
+    const n=ks.reduce((s,k)=>s+nProj(k),0);
+    html+=opt("opt-grupo",`data-setor="${escAttr(g.setor)}"${parc?' data-parc="1"':''}`,on,g.setor,n+(n>1?" projetos":" projeto"));
+    if(g.subs.length>1 || g.subs[0]!==g.setor) g.subs.forEach(s=>{const k=g.setor+"|"+s, c=nProj(k);
+      html+=opt("opt-sub",`data-sub="${escAttr(k)}"`,setorSel.includes(k),s,c+(c>1?" projetos":" projeto"));});
+  });
+  const box=document.getElementById("listSetor"); box.innerHTML=html;
+  box.querySelectorAll('input[data-parc]').forEach(i=>{i.indeterminate=true;});
+  let txt="Todos os setores";
+  if(!todos){
+    const nomes=grupos.flatMap(g=>{const ks=g.subs.map(s=>g.setor+"|"+s);
+      return ks.every(k=>setorSel.includes(k)) ? [g.setor] : g.subs.filter(s=>setorSel.includes(g.setor+"|"+s));});
+    txt=nomes.length<=2 ? nomes.join(", ") : nomes.length+" setores";
+  }
+  document.getElementById("dispSetorTxt").outerHTML=`<span class="${todos?'ph':''}" id="dispSetorTxt">${txt}</span>`;
+}
+function aplicarSetores(){   // após mudar o filtro: marca todos os projetos do escopo (sem filtro = limpa a seleção)
+  concSel.length=0; document.getElementById("buscaConc").value="";
+  if(setorSel.length || (modo==="uf" && ufSel.length)) concessoesAplicaveis().forEach(c=>concSel.push(c.nome));
+  renderListSetor(); recompor();
+}
+document.getElementById("dispSetor").onclick=()=>toggleDrop("dropSetor","dispSetor");
+document.getElementById("listSetor").addEventListener("change",e=>{
+  const t=e.target; if(!t.matches("input")) return;
+  if(t.dataset.setorTodos!==undefined){ setorSel=[]; }
+  else if(t.dataset.setor!==undefined){
+    const g=setoresDisp().find(x=>x.setor===t.dataset.setor); const ks=g.subs.map(s=>g.setor+"|"+s);
+    if(t.checked) ks.forEach(k=>{ if(!setorSel.includes(k)) setorSel.push(k); });
+    else setorSel=setorSel.filter(k=>!ks.includes(k));
+  }
+  else if(t.dataset.sub!==undefined){
+    const k=t.dataset.sub;
+    if(t.checked){ if(!setorSel.includes(k)) setorSel.push(k); } else setorSel=setorSel.filter(x=>x!==k);
+  }
+  const tot=setoresDisp().reduce((s,g)=>s+g.subs.length,0);
+  if(setorSel.length===tot) setorSel=[];   // tudo marcado = sem filtro
+  aplicarSetores();
+});
+
+// ===== tags =====
+function renderTags(){
+  const bar=document.getElementById("tagsbar");
+  bar.innerHTML=concSel.map((n,i)=>`<span class="tag"><span class="sw" style="background:${CORES[i%CORES.length]}"></span>${n}<span class="x" data-tag-conc="${n.replace(/"/g,'&quot;')}">×</span></span>`).join("");
+}
+
+// ===== resumo (KPIs no topo) =====
+function resumo(){
+  const items=[...munSel.values()]; let soma=0,maior=null;
+  items.forEach(m=>{if(m.pop){soma+=m.pop;if(!maior||m.pop>maior.pop)maior=m;}});
+  document.getElementById("k2").textContent=items.length;
+  document.getElementById("kEst").textContent=new Set(items.map(m=>m.uf).filter(Boolean)).size;
+  document.getElementById("k3").textContent=items.length?fmt(soma):"—";
+  const km=extTotal(concSel);
+  document.getElementById("k4").textContent=concSel.length&&km?fmtKm2(km):"—";
+  document.getElementById("k1").textContent=concSel.length;
+  document.getElementById("k1l").textContent="Projetos";
+  document.getElementById("maisPop").innerHTML=maior?`Mais populoso: <b>${maior.nome} (${maior.uf})</b> · ${fmt(maior.pop)}`:"";
+  document.getElementById("btnDownload").disabled=munSel.size===0;
+}
+
+// ===== tabela =====
+function renderTabela(){
+  const box=document.getElementById("tabela"); const items=[...munSel.values()];
+  if(!items.length){box.innerHTML=`<div class="placeholder${modo==="uf"&&!ufSel.length?" placeholder-uf":""}">${modo==="uf"&&!ufSel.length?"Selecione um ou mais estados para ver as concessões que passam por eles.":"Selecione uma ou mais concessões para destacar os municípios e ver a população."}</div>`;return;}
+  let html=`<table><thead><tr><th>Município</th><th>UF</th><th class="num">População · ${rotuloBase()}</th>`
+    +`<th class="num" title="Extensão da concessão distribuída entre os municípios que ela atravessa">Extensão (km)</th></tr></thead><tbody>`;
+  let total=0; const cont=new Set();
+  concSel.forEach((nome,ci)=>{
+    const c=DADOS.find(x=>x.nome===nome); if(!c)return; const cor=CORES[ci%CORES.length]; let sub=0,subKm=0;
+    html+=`<tr class="grupo"><td colspan="4"><span class="sw" style="background:${cor}"></span>${c.nome} · ${c.n_municipios} mun.${c.ext_km!=null?` · ${fmtKm2(c.ext_km)} km`:""}</td></tr>`;
+    c.municipios.forEach(m=>{if(m.pop){sub+=m.pop;if(!cont.has(m.id)){total+=m.pop;cont.add(m.id);}}
+      subKm+=m.ext_km||0;
+      html+=`<tr><td>${m.nome}</td><td>${m.uf}</td><td class="num pop">${fmt(m.pop)}</td>`
+        +`<td class="num ext">${fmtKm2(m.ext_km)}</td></tr>`;});
+    html+=`<tr class="subtotal"><td colspan="2">Subtotal</td><td class="num">${fmt(sub)}</td><td class="num">${c.ext_km!=null?fmtKm2(subKm):"—"}</td></tr>`;
+  });
+  html+=`</tbody><tfoot><tr><td colspan="2">TOTAL · ${munSel.size} mun. distintos</td><td class="num">${fmt(total)}</td><td class="num">${extTotal(concSel)?fmtKm2(extTotal(concSel)):"—"}</td></tr></tfoot></table>`;
+  box.innerHTML=html;
+}
+
+// ===== mapa =====
+async function desenharMapa(){
+  const meu=++genMapa; camadas.clearLayers();
+  const items=[...munSel.values()]; const temLinhas=concSel.length;
+  if(estiloVI&&brasilLayer) restilizarBrasil();   // realça os estados das concessões marcadas
+  if(!items.length&&!temLinhas){
+    if(estiloVI&&brasilLayer){try{mapa.fitBounds(brasilLayer.getBounds(),{padding:[20,20]});}catch(_){}}
+    else mapa.setView([-14.2,-51.9],4);
+    return;
+  }
+  const limites=[];
+  {   // no Estilo VI só desenhamos os polígonos dos projetos sem traçado (rodovias/ferrovias ficam só com a linha)
+    const semLinha=n=>{const c=DADOS.find(x=>x.nome===n); return c&&!c.linha;};
+    const fila=items.filter(it=>!estiloVI || (it.concs||[it.conc]).some(semLinha));
+    async function worker(){while(fila.length){const it=fila.shift();
+      try{const g=await buscarMalha(it.id); if(meu!==genMapa)return;
+        const concs=(it.concs||[it.conc]).filter(Boolean);
+        const cores=concs.map(n=>CORES[concSel.indexOf(n)%CORES.length]);
+        const rotConc=concs.length>1?"Projetos: ":"Projeto: ";
+        const nomesCor=concs.map((n,i)=>`<span style="color:${cores[i]};font-weight:700">${n}</span>`).join(", ")||"—";
+        const plain=`<b>${it.nome} (${it.uf})</b><br>População (${rotuloBase()}): ${fmt(it.pop)}<br>${rotConc}${concs.join(", ")||"—"}`;
+        const bg=cores.length<=1 ? (cores[0]||"#0056b3")
+          : `linear-gradient(135deg, ${cores.map((c,i)=>`${c} ${(i/cores.length*100).toFixed(1)}% ${((i+1)/cores.length*100).toFixed(1)}%`).join(", ")})`;
+        const tip=`<div class="mtip-wrap" style="background:${bg}"><div class="mtip">`
+          +`<b>${it.nome} (${it.uf})</b><br>População (${rotuloBase()}): <span class="mtip-pop">${fmt(it.pop)}</span><br>${rotConc}${nomesCor}</div></div>`;
+        const layer=L.geoJSON(g,{style:{color:it.cor,weight:1,fillColor:it.cor,fillOpacity:.20}})
+          .bindTooltip(tip,{sticky:true,className:"mtip-tt"}).bindPopup(plain);
+        layer.addTo(camadas);limites.push(layer.getBounds());}catch(_){}}}
+    await Promise.all(Array.from({length:8},worker));
+    if(meu!==genMapa)return;
+  }
+  if(temLinhas){concSel.forEach((nome,ci)=>{const c=DADOS.find(x=>x.nome===nome);if(!c||!c.linha)return;
+    const cor=estiloVI?COR_VI:CORES[ci%CORES.length];
+    const ferro=c.tipo==="ferroviaria";
+    L.geoJSON(c.linha,{style:{color:"#fff",weight:7,opacity:.9,lineJoin:"round",lineCap:"round"}}).addTo(camadas);
+    const est={color:cor,weight:4,opacity:1,lineJoin:"round",lineCap:"round"};
+    if(ferro && !c.solida){est.weight=3.5;est.dashArray="7 7";}
+    const ln=L.geoJSON(c.linha,{style:est}).bindPopup(
+      `<b>${c.nome}</b><br>${ferro?"Ferrovia":"Traçado"} · ${c.n_municipios} municípios`
+      +`<br>Extensão: <b>${fmtKm2(c.ext_km)} km</b>`);
+    ln.addTo(camadas);try{limites.push(ln.getBounds());}catch(_){}});}
+  if(limites.length){let b=limites[0];limites.slice(1).forEach(x=>b=b.extend(x));mapa.fitBounds(b,{padding:[26,26],maxZoom:11});}
+  else if(estiloVI&&brasilLayer){try{mapa.fitBounds(brasilLayer.getBounds(),{padding:[20,20]});}catch(_){}}
+}
+
+// ===== download CSV da seleção =====
+function escCSV(v){v=(v==null)?"":String(v);return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function baixarCSV(){
+  if(!munSel.size)return;
+  const linhas=[["Concessão","Município","UF","População ("+rotuloBase()+")",
+                 "Extensão no município (km)","Extensão da concessão (km)"]];
+  let total=0,totalKm=0; const cont=new Set();
+  concSel.forEach(nome=>{const c=DADOS.find(x=>x.nome===nome);if(!c)return;
+    c.municipios.forEach(m=>{linhas.push([c.nome,m.nome,m.uf,m.pop??"",
+      m.ext_km??"",c.ext_km??""]);
+      totalKm+=m.ext_km||0;
+      if(m.pop&&!cont.has(m.id)){total+=m.pop;cont.add(m.id);}});});
+  linhas.push([`TOTAL · ${munSel.size} municípios distintos`,"","",total,
+               Number(totalKm.toFixed(2)),Number(extTotal(concSel).toFixed(2))]);
+  const csv="﻿"+linhas.map(r=>r.map(escCSV).join(";")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  const dt=new Date(),iso=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  a.href=url; a.download=`selecao_municipios_${iso}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// ===== download XLSX formatado (ExcelJS) =====
+async function baixarXLSX(){
+  if(!munSel.size)return;
+  if(!window.ExcelJS){baixarCSV();return;}  // fallback se a CDN não carregou
+  const P="FF0056B3",LB="FFEFF6FF",TB="FFDBEAFE",GR="FFF1F5F9",BD="FFE2E8F0",TS="FF64748B",TX="FF1E293B",W="FFFFFFFF";
+  const thin={style:"thin",color:{argb:BD}}, borda={top:thin,left:thin,right:thin,bottom:thin};
+  const fill=a=>({type:"pattern",pattern:"solid",fgColor:{argb:a}});
+  const wb=new ExcelJS.Workbook(); wb.creator="Painel IBGE — Concessões × Municípios";
+  const ws=wb.addWorksheet("Seleção",{views:[{showGridLines:false}]});
+  ws.getColumn(1).width=46; ws.getColumn(2).width=30; ws.getColumn(3).width=6; ws.getColumn(4).width=18;
+  ws.getColumn(5).width=20;
+  const NS1=5;   // colunas da aba "Seleção"
+  const dt=new Date();
+  let r=1;
+  // título
+  ws.mergeCells(r,1,r,NS1); let c=ws.getCell(r,1);
+  c.value=`Concessões × Municípios — População (${base==="2025"?"Estimativa 2025":"Censo 2022"}, IBGE)`;
+  c.font={bold:true,size:14,color:{argb:W}}; c.fill=fill(P); c.alignment={vertical:"middle",indent:1};
+  ws.getRow(r).height=28; r++;
+  // subtítulo
+  ws.mergeCells(r,1,r,NS1); c=ws.getCell(r,1);
+  c.value=`${concSel.length} concessão(ões) · ${munSel.size} municípios distintos · base ${rotuloBase()} — gerado em ${dt.toLocaleDateString("pt-BR")}`
+    +` · a extensão de cada concessão é distribuída entre os municípios que ela atravessa`;
+  c.font={size:10,italic:true,color:{argb:TS}}; c.alignment={indent:1}; ws.getRow(r).height=18; r++;
+  // cabeçalho
+  ["Concessão","Município","UF","População ("+rotuloBase()+")","Extensão no município (km)"].forEach((h,i)=>{
+    const cc=ws.getCell(r,i+1); cc.value=h; cc.font={bold:true,color:{argb:W}}; cc.fill=fill(P);
+    cc.alignment={horizontal:i>=3?"right":(i===2?"center":"left"),vertical:"middle",wrapText:true}; cc.border=borda;
+  });
+  ws.getRow(r).height=20; const headerRow=r; r++;
+  const faixa=(c1,c2,bg)=>{for(let i=c1;i<=c2;i++){const x=ws.getCell(r,i);if(bg)x.fill=fill(bg);x.border=borda;}};
+  const dado=(conc,mun,uf,pop,km)=>{
+    const row=ws.getRow(r);
+    row.getCell(1).value=conc; row.getCell(2).value=mun; row.getCell(3).value=uf;
+    const pc=row.getCell(4); pc.value=(pop??null); pc.numFmt="#,##0";
+    const kc=row.getCell(5); kc.value=(km??null); kc.numFmt="#,##0.00";
+    for(let i=1;i<=NS1;i++){const x=row.getCell(i);x.border=borda;x.font={color:{argb:TX}};
+      x.alignment={horizontal:i>=4?"right":(i===3?"center":"left"),vertical:"middle"};}
+    r++;
+  };
+  let total=0,totalKm=0; const cont=new Set();
+  concSel.forEach(nome=>{const cc=DADOS.find(x=>x.nome===nome); if(!cc)return; let sub=0,subKm=0;
+    ws.mergeCells(r,1,r,NS1); const g=ws.getCell(r,1);
+    g.value=`${cc.nome} · ${cc.n_municipios} municípios${cc.ext_km!=null?` · ${fmtKm2(cc.ext_km)} km`:""}`;
+    g.font={bold:true,color:{argb:P}}; faixa(1,NS1,LB); g.alignment={vertical:"middle",indent:1}; ws.getRow(r).height=18; r++;
+    cc.municipios.forEach(m=>{dado(cc.nome,m.nome,m.uf,m.pop,m.ext_km); subKm+=m.ext_km||0;
+      if(m.pop){sub+=m.pop; if(!cont.has(m.id)){total+=m.pop;cont.add(m.id);}}});
+    ws.mergeCells(r,1,r,3); const sl=ws.getCell(r,1); sl.value="Subtotal"; sl.alignment={horizontal:"right",indent:1};
+    sl.font={italic:true,bold:true,color:{argb:TS}};
+    const sv=ws.getCell(r,4); sv.value=sub; sv.numFmt="#,##0"; sv.font={italic:true,bold:true,color:{argb:TS}}; sv.alignment={horizontal:"right"};
+    const sk=ws.getCell(r,5); sk.value=Number(subKm.toFixed(2)); sk.numFmt="#,##0.00";
+    sk.font={italic:true,bold:true,color:{argb:TS}}; sk.alignment={horizontal:"right"};
+    totalKm+=subKm; faixa(1,NS1,GR); r++;
+  });
+  // total geral
+  ws.mergeCells(r,1,r,3); const tl=ws.getCell(r,1);
+  tl.value=`TOTAL · ${munSel.size} municípios distintos`;
+  tl.font={bold:true,size:12,color:{argb:P}}; tl.alignment={horizontal:"right",indent:1};
+  const tv=ws.getCell(r,4); tv.value=total; tv.numFmt="#,##0"; tv.font={bold:true,size:12,color:{argb:P}}; tv.alignment={horizontal:"right"};
+  const tk1=ws.getCell(r,5); tk1.value=Number(totalKm.toFixed(2)); tk1.numFmt="#,##0.00";
+  tk1.font={bold:true,size:12,color:{argb:P}}; tk1.alignment={horizontal:"right"};
+  faixa(1,NS1,TB); ws.getRow(r).height=22;
+  // congelar cabeçalho + autofiltro
+  ws.views=[{state:"frozen",ySplit:headerRow,showGridLines:false}];
+  ws.autoFilter={from:{row:headerRow,column:1},to:{row:headerRow,column:NS1}};
+
+  // ---- aba 2: uma linha por concessão ----
+  const w2=wb.addWorksheet("Concessões",{views:[{showGridLines:false}]});
+  [46,14,11,13,18,17].forEach((w,i)=>{w2.getColumn(i+1).width=w;});
+  const NC=6;
+  let r2=1;
+  w2.mergeCells(r2,1,r2,NC); let c2=w2.getCell(r2,1);
+  c2.value="Extensão por concessão";
+  c2.font={bold:true,size:14,color:{argb:W}}; c2.fill=fill(P); c2.alignment={vertical:"middle",indent:1};
+  w2.getRow(r2).height=28; r2++;
+  w2.mergeCells(r2,1,r2,NC); c2=w2.getCell(r2,1);
+  c2.value=`${concSel.length} concessão(ões) · base ${rotuloBase()} · a extensão de cada concessão é distribuída entre os municípios na aba "Seleção".`;
+  c2.font={size:10,italic:true,color:{argb:TS}}; c2.alignment={indent:1}; w2.getRow(r2).height=18; r2++;
+  const H2=["Concessão","Tipo","Esfera","Municípios","População ("+rotuloBase()+")","Extensão (km)"];
+  H2.forEach((h,i)=>{const cc=w2.getCell(r2,i+1); cc.value=h; cc.font={bold:true,color:{argb:W}}; cc.fill=fill(P);
+    cc.alignment={horizontal:i>=3?"right":"left",vertical:"middle",wrapText:true}; cc.border=borda;});
+  w2.getRow(r2).height=26; const head2=r2; r2++;
+  let tKm=0,tMun=0;
+  concSel.forEach(nome=>{
+    const cc=DADOS.find(x=>x.nome===nome); if(!cc)return;
+    const row=w2.getRow(r2);
+    const vals=[cc.nome, cc.tipo==="ferroviaria"?"Ferrovia":(cc.tipo==="projeto"?cc.setor+" · "+cc.subsetor:"Rodovia"), cc.esfera||"—", cc.n_municipios,
+                cc.pop_total, cc.ext_km??null];
+    vals.forEach((v,i)=>{const x=row.getCell(i+1); x.value=v; x.border=borda; x.font={color:{argb:TX}};
+      x.alignment={horizontal:i>=3?"right":"left",vertical:"middle"};});
+    row.getCell(4).numFmt="#,##0"; row.getCell(5).numFmt="#,##0"; row.getCell(6).numFmt="#,##0.00";
+    tKm+=cc.ext_km||0; tMun+=cc.n_municipios||0;
+    r2++;
+  });
+  w2.mergeCells(r2,1,r2,3); const t2=w2.getCell(r2,1);
+  t2.value=`TOTAL · ${concSel.length} concessão(ões)`; t2.font={bold:true,size:12,color:{argb:P}};
+  t2.alignment={horizontal:"right",indent:1};
+  const tm=w2.getCell(r2,4); tm.value=tMun; tm.numFmt="#,##0";
+  const tp=w2.getCell(r2,5); tp.value=[...munSel.values()].reduce((s,m)=>s+(m.pop||0),0); tp.numFmt="#,##0";
+  const tk=w2.getCell(r2,6); tk.value=Number(tKm.toFixed(2)); tk.numFmt="#,##0.00";
+  [tm,tp,tk].forEach(x=>{x.font={bold:true,size:12,color:{argb:P}};x.alignment={horizontal:"right"};});
+  for(let i=1;i<=NC;i++){const x=w2.getCell(r2,i); x.fill=fill(TB); x.border=borda;}
+  w2.getRow(r2).height=22; r2++;
+  w2.getCell(r2,1).value="Municípios do total somam por concessão (município em 2 concessões conta 2x aqui); "
+    +"a população do total é de municípios distintos.";
+  w2.getCell(r2,1).font={size:9,italic:true,color:{argb:TS}};
+  w2.views=[{state:"frozen",ySplit:head2,showGridLines:false}];
+  w2.autoFilter={from:{row:head2,column:1},to:{row:head2,column:NC}};
+
+  // gerar e baixar
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  const iso=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  a.href=url; a.download=`selecao_municipios_${iso}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// ===== troca de modo =====
+function setModo(m){
+  modo=m; fecharDrops();
+  document.querySelectorAll(".nav-btn[data-modo]").forEach(b=>b.classList.toggle("active",b.dataset.modo===m));
+  document.getElementById("wrapUf").classList.toggle("hide",m!=="uf");  // lista de concessões fica nos dois modos
+  document.querySelector(".toolbar").classList.toggle("modo-uf",m==="uf");  // compacta os seletores só no modo estado
+  concSel.length=0; munSel=new Map();
+  if(m==="uf"){ if(ufSel.length) concessoesAplicaveis().forEach(c=>concSel.push(c.nome)); renderListUf(); }
+  else if(setorSel.length) concessoesAplicaveis().forEach(c=>concSel.push(c.nome));   // mantém o filtro de setores
+  recompor();
+  setTimeout(()=>mapa.invalidateSize(),60);
+}
+
+// ===== eventos =====
+document.querySelectorAll(".nav-btn[data-modo]").forEach(b=>b.addEventListener("click",()=>setModo(b.dataset.modo)));
+document.getElementById("btnEstiloVI").addEventListener("click",()=>setEstiloVI(!estiloVI));
+document.getElementById("baseSeg").addEventListener("click",e=>{
+  const b=e.target.closest(".seg-btn"); if(!b||b.dataset.base===base) return;
+  document.querySelectorAll("#baseSeg .seg-btn").forEach(x=>x.classList.toggle("active",x===b));
+  aplicarBase(b.dataset.base); recompor();
+});
+document.getElementById("buscaConc").addEventListener("input",renderListConc);
+document.getElementById("esferaFiltros").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return;
+  const acao=c.dataset.acao; const base=concessoesAplicaveis();
+  if(acao==="todas"){                      // marca/desmarca TODAS as concessões do escopo atual
+    const todas=base.length>0 && concSel.length===base.length;
+    concSel.length=0;
+    if(!todas) base.forEach(d=>concSel.push(d.nome));
+    recompor();
+  }else{                                   // Federais / Estaduais / Ferroviárias — marca/desmarca o grupo
+    const g=grupoNomes(acao);
+    const todasMarc=g.length>0 && g.every(n=>concSel.includes(n));
+    if(todasMarc) g.forEach(n=>{const i=concSel.indexOf(n);if(i>=0)concSel.splice(i,1);});
+    else g.forEach(n=>{if(!concSel.includes(n))concSel.push(n);});
+    recompor();
+  }
+});
+document.getElementById("listConc").addEventListener("change",e=>{if(e.target.matches('input'))toggleConc(e.target.dataset.nome,e.target.checked);});
+document.getElementById("listUf").addEventListener("change",e=>{
+  if(!e.target.matches('input'))return;
+  if(e.target.dataset.all!==undefined)toggleTodosUf();
+  else toggleUf(e.target.dataset.uf,e.target.checked);
+});
+document.getElementById("tagsbar").addEventListener("click",e=>{const x=e.target.closest(".x");if(!x)return;
+  if(x.dataset.tagConc!=null)toggleConc(x.dataset.tagConc,false);});
+document.getElementById("btnDownload").addEventListener("click",baixarXLSX);
+document.getElementById("limpar").onclick=()=>{
+  setorSel=[]; renderListSetor();
+  if(modo==="uf"){ufSel.length=0;renderListUf();}
+  concSel.length=0;munSel=new Map();recompor();};
+window.addEventListener("resize",()=>mapa.invalidateSize());
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&mapaExpandido)toggleExpandir();});
+
+// ===== start =====
+aplicarBase(base);   // aponta m.pop/c.pop_total para a base padrão (Censo 2022) antes do 1º render
+popularEstados();
+renderListSetor();
+if(!DADOS.length)document.getElementById("listConc").innerHTML='<div class="placeholder">Rode <b>gerar_concessoes.py</b> primeiro.</div>';
+else renderListConc();
+resumo();
+setTimeout(()=>mapa.invalidateSize(),120);
+</script>
+</body>
+</html>
